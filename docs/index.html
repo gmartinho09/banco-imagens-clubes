@@ -26,6 +26,7 @@
   :root { --bg: #0f1613; --surface: #17211c; --ink: #e6ede8; --muted: #93a49a; --line: #2a3831; --pitch: #4fae7b; color-scheme: dark; }
 }
 * { box-sizing: border-box; }
+[hidden] { display: none !important; }
 body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.55 var(--body); }
 a { color: inherit; }
 :focus-visible { outline: 3px solid var(--pitch); outline-offset: 2px; }
@@ -99,6 +100,18 @@ section.group { display: grid; gap: 12px; }
 .banks small { color: var(--muted); text-align: right; }
 @media (max-width: 400px) { .banks { grid-template-columns: 1fr; } }
 
+.tabs { display: flex; gap: 4px; border-bottom: 2px solid var(--ink); }
+.tabs button { font: 800 22px/1 var(--display); text-transform: uppercase; letter-spacing: .02em; padding: 12px 18px 10px; border: 0; border-radius: 6px 6px 0 0; background: transparent; color: var(--muted); cursor: pointer; display: flex; gap: 8px; align-items: baseline; }
+.tabs button[aria-selected="true"] { background: var(--ink); color: var(--bg); }
+.tabs button[aria-selected="true"] .count { color: inherit; opacity: .7; }
+.panel { display: grid; gap: 28px; }
+.tile button.img { border: 0; padding: 0; width: 100%; cursor: pointer; font: inherit; }
+.tile.video .img { background: #000; }
+.tile .play { position: absolute; left: 50%; top: 50%; width: 54px; height: 54px; margin: -27px 0 0 -27px; border-radius: 50%; background: rgba(0,0,0,.6); border: 2px solid #fff; }
+.tile .play::after { content: ""; position: absolute; left: 21px; top: 15px; border-style: solid; border-width: 11px 0 11px 17px; border-color: transparent transparent transparent #fff; }
+.tile .img:hover .play { background: var(--pitch); }
+.tile .dur { position: absolute; right: 8px; bottom: 8px; background: rgba(0,0,0,.75); color: #fff; font: 600 11px var(--body); padding: 2px 6px; border-radius: 4px; }
+.tile .player { width: 100%; aspect-ratio: 16/9; background: #000; display: block; }
 .note { font-size: 13px; color: var(--muted); max-width: 70ch; }
 .toast { position: fixed; left: 50%; bottom: calc(20px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); background: var(--ink); color: var(--bg); padding: 10px 16px; border-radius: 6px; font-weight: 600; font-size: 14px; }
 @media (prefers-reduced-motion: no-preference) { .tile { transition: transform .15s; } .tile:hover { transform: translateY(-2px); } }
@@ -174,9 +187,10 @@ async function openClub(params, keepIntro = false) {
   } catch (err) { main.innerHTML = intro + `<p class="error">${esc(friendly(err))}</p>`; }
 }
 
+let tab = 'imagens';
+
 function render(d, intro) {
   const t = d.team;
-  const allLinks = d.groups.flatMap((g) => g.items.map((i) => i.url));
   let html = intro;
   if (t) {
     const [c1 = '#1f5a3c', c2 = '#ffffff'] = t.colors;
@@ -185,48 +199,102 @@ function render(d, intro) {
       <div><h2>${esc(t.name)}</h2>${t.alternate ? `<div class="alt">${esc(t.alternate)}</div>` : ''}
       <dl>${[['País', t.country], ['Liga', t.league], ['Fundação', t.founded], ['Estádio', t.stadium], ['Cidade', t.location]]
         .filter(([, v]) => v).map(([k, v]) => `<div><dt>${k}</dt><dd>${esc(v)}</dd></div>`).join('')}
-      ${t.website ? `<div><dt>Site oficial</dt><dd><a href="${esc(t.website)}" target="_blank" rel="noopener">${esc(t.website.replace(/^https?:\/\//, ''))}</a></dd></div>` : ''}</dl></div>
+      ${t.website ? `<div><dt>Site oficial</dt><dd><a href="${esc(t.website)}" target="_blank" rel="noopener">${esc(t.website.replace(/^https?:\/\//, ''))}</a></dd></div>` : ''}
+      ${t.youtube ? `<div><dt>YouTube</dt><dd><a href="${esc(t.youtube)}" target="_blank" rel="noopener">Canal oficial</a></dd></div>` : ''}</dl></div>
     </article>`;
   }
-  html += `<div class="toolbar"><h3>Imagens de “${esc(d.query)}”</h3>
-    <span style="display:flex;gap:8px;flex-wrap:wrap"><span class="count">${allLinks.length} imagens</span>
-    ${allLinks.length ? `<button class="btn" data-copy-all>Copiar todos os links</button><button class="btn" data-export>Copiar como JSON</button>` : ''}</span></div>`;
+  const nImg = d.groups.reduce((n, g) => n + g.items.length, 0);
+  const nVid = d.videoGroups.reduce((n, g) => n + g.items.length, 0);
+  html += `<div class="tabs" role="tablist">
+      <button role="tab" id="tab-imagens" data-tab="imagens" aria-selected="${tab === 'imagens'}">Imagens <span class="count">${nImg}</span></button>
+      <button role="tab" id="tab-videos" data-tab="videos" aria-selected="${tab === 'videos'}">Vídeos <span class="count">${nVid}</span></button>
+    </div>`;
   if (d.commonsError) html += `<p class="note">${esc(d.commonsError)}</p>`;
-  for (const g of d.groups) {
-    const wide = g.items.some((i) => i.wide) || g.key === 'commons';
-    html += `<section class="group"><div class="group-head"><h3>${esc(g.title)}</h3><span class="count">${g.items.length}</span><span class="src">Fonte: ${esc(g.source)}</span></div>
-      <div class="grid ${wide ? 'wide' : ''}">${g.items.map(tile).join('')}</div></section>`;
-  }
-  const byGroup = d.banks.reduce((m, b) => ((m[b.group] ||= []).push(b), m), {});
-  html += `<section class="group"><div class="group-head"><h3>Bancos de imagens</h3><span class="count">${d.banks.length} links</span>
-      <button class="btn" style="margin-left:auto" data-copy-banks>Copiar links</button></div>
-    <div class="banks">${Object.entries(byGroup).map(([g, list]) => `<div><h4>${esc(g)}</h4><ul>${list.map((b) =>
-      `<li><a href="${esc(b.url)}" target="_blank" rel="noopener"><b>${esc(b.name)}</b><small>${esc(b.note)}</small></a></li>`).join('')}</ul></div>`).join('')}</div>
-    <p class="note">Escudos e marcas pertencem aos respetivos clubes. As imagens do Wikimedia Commons têm licença livre (confirma a atribuição na página de cada ficheiro); as agências de stock exigem licença para uso comercial e editorial.</p></section>`;
+  html += `<div role="tabpanel" aria-labelledby="tab-imagens" class="panel" ${tab === 'imagens' ? '' : 'hidden'}>
+    ${panel(`Imagens de “${d.query}”`, d.groups, nImg, 'imagens')}
+    ${banksSection('Bancos de imagens', d.banks, 'Escudos e marcas pertencem aos respetivos clubes. As imagens do Wikimedia Commons têm licença livre (confirma a atribuição na página de cada ficheiro); as agências de stock exigem licença para uso comercial e editorial.')}
+  </div>
+  <div role="tabpanel" aria-labelledby="tab-videos" class="panel" ${tab === 'videos' ? '' : 'hidden'}>
+    ${panel(`Vídeos de “${d.query}”`, d.videoGroups, nVid, 'vídeos', 'Sem vídeos diretos para este clube. Usa os bancos de vídeo abaixo.')}
+    ${banksSection('Bancos de vídeo', d.videoBanks, 'Os vídeos do Wikimedia Commons têm licença livre e tocam aqui na página. Os resumos dos jogos abrem no YouTube; a transmissão de jogos é protegida por direitos e não pode ser reutilizada sem licença.')}
+  </div>`;
   main.innerHTML = html;
 }
 
+function panel(title, groups, n, noun, empty = '') {
+  let html = `<div class="toolbar"><h3>${esc(title)}</h3>
+    <span style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"><span class="count">${n} ${noun}</span>
+    ${n ? `<button class="btn" data-copy-all>Copiar todos os links</button><button class="btn" data-export>Copiar como JSON</button>` : ''}</span></div>`;
+  if (!n && empty) html += `<p class="status">${esc(empty)}</p>`;
+  for (const g of groups) {
+    const wide = g.items.some((i) => i.wide || i.type) || g.key === 'commons';
+    html += `<section class="group"><div class="group-head"><h3>${esc(g.title)}</h3><span class="count">${g.items.length}</span><span class="src">Fonte: ${esc(g.source)}</span></div>
+      <div class="grid ${wide ? 'wide' : ''}">${g.items.map(tile).join('')}</div></section>`;
+  }
+  return html;
+}
+
+function banksSection(title, banks, note) {
+  const byGroup = banks.reduce((m, b) => ((m[b.group] ||= []).push(b), m), {});
+  return `<section class="group"><div class="group-head"><h3>${esc(title)}</h3><span class="count">${banks.length} links</span>
+      <button class="btn" style="margin-left:auto" data-copy-banks>Copiar links</button></div>
+    <div class="banks">${Object.entries(byGroup).map(([g, list]) => `<div><h4>${esc(g)}</h4><ul>${list.map((b) =>
+      `<li><a href="${esc(b.url)}" target="_blank" rel="noopener"><b>${esc(b.name)}</b><small>${esc(b.note)}</small></a></li>`).join('')}</ul></div>`).join('')}</div>
+    <p class="note">${esc(note)}</p></section>`;
+}
+
 function tile(i) {
-  const thumb = i.thumb || (/thesportsdb\.com/.test(i.url) ? `${i.url}/medium` : i.url);
   const sub = [i.license, i.author, i.size].filter(Boolean).join(' · ');
+  const meta = (openLabel) => `<figcaption class="meta"><b>${esc(i.label)}</b>${sub ? `<small>${esc(sub)}</small>` : ''}
+      <span class="url" title="${esc(i.url)}">${esc(i.url.replace(/^https?:\/\//, ''))}</span>
+      <span class="actions"><a href="${esc(i.url)}" target="_blank" rel="noopener">${openLabel}</a>
+      <button type="button" data-copy="${esc(i.url)}">Copiar link</button>
+      ${i.page ? `<a href="${esc(i.page)}" target="_blank" rel="noopener">Licença</a>` : ''}</span></figcaption>`;
+  const poster = i.thumb ? `<img src="${esc(i.thumb)}" alt="" loading="lazy">` : '';
+  if (i.type === 'video') {
+    return `<figure class="tile photo video" style="margin:0">
+      <button type="button" class="img" data-play="${esc(i.url)}" aria-label="Ver ${esc(i.label)}">${poster}
+        <span class="play" aria-hidden="true"></span>${i.duration ? `<span class="dur">${esc(i.duration)}</span>` : ''}</button>
+      ${meta('Abrir ficheiro')}</figure>`;
+  }
+  if (i.type === 'match') {
+    return `<figure class="tile photo video" style="margin:0">
+      <a class="img" href="${esc(i.url)}" target="_blank" rel="noopener" aria-label="Ver resumo de ${esc(i.label)}">${poster}
+        <span class="play" aria-hidden="true"></span><span class="dur">${i.official ? 'Resumo oficial' : 'YouTube'}</span></a>
+      ${meta(i.official ? 'Ver resumo' : 'Procurar resumo')}</figure>`;
+  }
+  const thumb = i.thumb || (/thesportsdb\.com/.test(i.url) ? `${i.url}/medium` : i.url);
   const photo = /\.jpe?g$/i.test(i.url);
   return `<figure class="tile${photo ? ' photo' : ''}" style="margin:0">
     <a class="img" href="${esc(i.url)}" target="_blank" rel="noopener"><img src="${esc(thumb)}" alt="${esc(i.label)}" loading="lazy" onerror="this.src='${esc(i.url)}';this.onerror=null"></a>
-    <figcaption class="meta"><b>${esc(i.label)}</b>${sub ? `<small>${esc(sub)}</small>` : ''}
-      <span class="url" title="${esc(i.url)}">${esc(i.url.replace(/^https?:\/\//, ''))}</span>
-      <span class="actions"><a href="${esc(i.url)}" target="_blank" rel="noopener">Abrir</a>
-      <button type="button" data-copy="${esc(i.url)}">Copiar link</button>
-      ${i.page ? `<a href="${esc(i.page)}" target="_blank" rel="noopener">Licença</a>` : ''}</span></figcaption></figure>`;
+    ${meta('Abrir')}</figure>`;
 }
 
 main.addEventListener('click', (e) => {
   const b = e.target.closest('button'); if (!b || !current) return;
+  const isVid = tab === 'videos';
+  const groups = isVid ? current.videoGroups : current.groups;
+  const banks = isVid ? current.videoBanks : current.banks;
+  if (b.dataset.tab) {
+    tab = b.dataset.tab;
+    main.querySelectorAll('[role=tab]').forEach((t) => t.setAttribute('aria-selected', t.dataset.tab === tab));
+    main.querySelectorAll('[role=tabpanel]').forEach((p) => (p.hidden = p.getAttribute('aria-labelledby') !== `tab-${tab}`));
+  }
+  if (b.dataset.play) {
+    const v = document.createElement('video');
+    v.src = b.dataset.play; v.controls = true; v.autoplay = true; v.playsInline = true; v.className = 'player';
+    b.replaceWith(v);
+  }
   if (b.dataset.copy) copy(b.dataset.copy);
-  if ('copyAll' in b.dataset) copy(current.groups.flatMap((g) => g.items.map((i) => i.url)).join('\n'), 'Links das imagens copiados');
-  if ('copyBanks' in b.dataset) copy(current.banks.map((x) => `${x.name}: ${x.url}`).join('\n'), 'Links dos bancos copiados');
-  if ('export' in b.dataset) copy(JSON.stringify({ clube: current.team?.name || current.query,
-    imagens: current.groups.map((g) => ({ categoria: g.title, fonte: g.source, links: g.items.map((i) => ({ nome: i.label, url: i.url, licenca: i.license || undefined })) })),
-    bancos: current.banks.map((x) => ({ nome: x.name, url: x.url })) }, null, 2), 'JSON copiado');
+  if ('copyAll' in b.dataset) copy(groups.flatMap((g) => g.items.map((i) => i.url)).join('\n'), isVid ? 'Links dos vídeos copiados' : 'Links das imagens copiados');
+  if ('copyBanks' in b.dataset) copy(banks.map((x) => `${x.name}: ${x.url}`).join('\n'), 'Links dos bancos copiados');
+  if ('export' in b.dataset) {
+    const pack = (gs) => gs.map((g) => ({ categoria: g.title, fonte: g.source, links: g.items.map((i) => ({ nome: i.label, url: i.url, licenca: i.license || undefined })) }));
+    copy(JSON.stringify({ clube: current.team?.name || current.query,
+      imagens: pack(current.groups), videos: pack(current.videoGroups),
+      bancos_imagens: current.banks.map((x) => ({ nome: x.name, url: x.url })),
+      bancos_video: current.videoBanks.map((x) => ({ nome: x.name, url: x.url })) }, null, 2), 'JSON copiado');
+  }
 });
 
 // Garante contraste do texto sobre a cor principal do clube.

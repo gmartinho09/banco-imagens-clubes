@@ -5,9 +5,14 @@ Procura qualquer clube de futebol e reúne, numa só página:
 - **Imagens diretas** (com link para abrir/copiar): escudo, logótipo, banner, fan art, equipamentos por época e estádio, vindos do [TheSportsDB](https://www.thesportsdb.com).
 - **Imagens com licença livre** do [Wikimedia Commons](https://commons.wikimedia.org), com licença, autor e resolução.
 - **Links de pesquisa já feitos** para 15 bancos de imagens: Commons, Flickr CC, Unsplash, Pexels, Pixabay, Getty Images, Shutterstock, Adobe Stock, Alamy, IMAGO, Google/Bing Imagens e sites de logótipos.
-- Botões para copiar um link, todos os links ou tudo em JSON.
+- **Vídeos**, num separador próprio:
+  - vídeos com licença livre do Wikimedia Commons, que tocam diretamente na página;
+  - resumos dos últimos jogos do clube (link para o YouTube);
+  - canal oficial do clube no YouTube;
+  - links de pesquisa para 12 bancos de vídeo: YouTube, Commons, Pexels, Pixabay, Getty Images, Shutterstock, Adobe Stock, Storyblocks, Dailymotion e Vimeo.
+- Botões para copiar um link, todos os links ou tudo em JSON (imagens e vídeos).
 
-Se o clube não estiver na base do TheSportsDB, a página mostra na mesma as imagens do Commons e os links dos bancos para o nome escrito.
+Se o clube não estiver na base do TheSportsDB, a página mostra na mesma as imagens e vídeos do Commons e os links dos bancos para o nome escrito.
 
 ## Site online
 
