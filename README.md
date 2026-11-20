@@ -9,7 +9,13 @@ Procura qualquer clube de futebol e reúne, numa só página:
 
 Se o clube não estiver na base do TheSportsDB, a página mostra na mesma as imagens do Commons e os links dos bancos para o nome escrito.
 
-## Como correr
+## Site online
+
+https://gmartinho09.github.io/banco-imagens-clubes/
+
+O site é estático (pasta `docs/`, publicada pelo GitHub Pages): o navegador consulta diretamente o TheSportsDB e o Wikimedia Commons, sem servidor.
+
+## Como correr localmente
 
 Precisa de Node.js 18 ou mais recente. Não tem dependências.
 
@@ -19,7 +25,7 @@ npm start
 
 Abre http://localhost:3000 (ou `http://localhost:3000/?q=Benfica` para ir direto a um clube).
 
-## API
+## API (opcional, só com `npm start`)
 
 | Rota | Devolve |
 |---|---|
@@ -30,9 +36,10 @@ Abre http://localhost:3000 (ou `http://localhost:3000/?q=Benfica` para ir direto
 ## Configuração
 
 - `PORT`: porta do servidor (padrão 3000).
-- `THESPORTSDB_KEY`: chave do TheSportsDB. A chave gratuita `123` é usada por padrão; uma chave Patreon dá mais resultados (por exemplo, todo o histórico de equipamentos).
+- `THESPORTSDB_KEY` (só no servidor Node): chave do TheSportsDB. A chave gratuita `123` é usada por padrão; uma chave Patreon dá mais resultados (por exemplo, todo o histórico de equipamentos).
 
 ## Notas
 
 - As respostas das APIs ficam em cache 30 minutos.
+- Para mudar o site, edita `docs/index.html` (página) e `docs/sources.js` (fontes e links, partilhado com o servidor).
 - Escudos e marcas pertencem aos clubes. Antes de usar uma imagem, confirma a licença: o Commons exige atribuição e as agências de stock exigem licença paga.

@@ -1,5 +1,5 @@
 // Teste rápido contra as APIs reais: node test.js
-const { searchTeams, lookupTeam, teamImages, imageBankLinks } = require('./sources');
+const { searchTeams, lookupTeam, teamImages, imageBankLinks } = require('./docs/sources');
 (async () => {
   const teams = await searchTeams('Benfica');
   console.assert(teams.length > 0, 'pesquisa sem resultados');

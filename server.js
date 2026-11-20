@@ -1,10 +1,10 @@
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
-const { searchTeams, lookupTeam, teamImages, commonsImages, imageBankLinks } = require('./sources');
+const { searchTeams, getClub } = require('./docs/sources');
 
 const PORT = Number(process.env.PORT) || 3000;
-const PUBLIC = path.join(__dirname, 'public');
+const PUBLIC = path.join(__dirname, 'docs');
 const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.svg': 'image/svg+xml', '.ico': 'image/x-icon' };
 
 function send(res, status, body) {
@@ -22,26 +22,12 @@ async function api(url, res) {
   }
 
   if (url.pathname === '/api/club') {
-    const idParam = url.searchParams.get('id');
-    let team = null;
-    let groups = [];
-    if (idParam) {
-      if (!/^\d+$/.test(idParam)) return send(res, 400, { error: 'Identificador de clube inválido.' });
-      const found = await lookupTeam(idParam);
-      if (!found) return send(res, 404, { error: 'Clube não encontrado.' });
-      team = found.summary;
-      groups = await teamImages(found.raw);
-    } else if (q.length < 2) {
-      return send(res, 400, { error: 'Indica um clube (id ou q).' });
+    try {
+      return send(res, 200, await getClub({ id: url.searchParams.get('id'), q }));
+    } catch (e) {
+      if (e.name === 'TypeError' || /^\d{3} em /.test(e.message)) throw e; // falha de rede → 502
+      return send(res, /não encontrado/i.test(e.message) ? 404 : 400, { error: e.message });
     }
-    const name = team ? team.alternate.split(',')[0].trim() || team.name : q;
-    const searchName = team ? team.name : q;
-    let commons = [];
-    let commonsError = null;
-    try { commons = await commonsImages(name); if (!commons.length && name !== searchName) commons = await commonsImages(searchName); }
-    catch (e) { commonsError = 'O Wikimedia Commons não respondeu agora. Usa o link do Commons abaixo.'; }
-    if (commons.length) groups.push({ key: 'commons', title: 'Wikimedia Commons (licença livre)', source: 'Wikimedia Commons', items: commons });
-    return send(res, 200, { team, query: searchName, groups, commonsError, banks: imageBankLinks(searchName) });
   }
 
   send(res, 404, { error: 'Rota desconhecida.' });

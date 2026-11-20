@@ -123,6 +123,7 @@ section.group { display: grid; gap: 12px; }
 
 <div class="toast" id="toast" hidden></div>
 
+<script src="sources.js"></script>
 <script>
 const SUGGESTIONS = ['Benfica', 'Porto', 'Sporting CP', 'Flamengo', 'Palmeiras', 'Corinthians', 'Real Madrid', 'Barcelona', 'Manchester United', 'Boca Juniors'];
 const $ = (s) => document.querySelector(s);
@@ -134,14 +135,15 @@ $('#chips').innerHTML = SUGGESTIONS.map((s) => `<button type="button" data-q="${
 $('#chips').addEventListener('click', (e) => { const b = e.target.closest('button'); if (b) { $('#q').value = b.dataset.q; search(b.dataset.q); } });
 $('#form').addEventListener('submit', (e) => { e.preventDefault(); search($('#q').value.trim()); });
 
+function friendly(err) {
+  return err instanceof TypeError || err.name === 'TimeoutError'
+    ? 'Não foi possível contactar a base de dados de clubes. Verifica a ligação e tenta de novo.'
+    : err.message;
+}
 function toast(msg) { const t = $('#toast'); t.textContent = msg; t.hidden = false; clearTimeout(toast.h); toast.h = setTimeout(() => (t.hidden = true), 1800); }
 async function copy(text, msg = 'Link copiado') {
   try { await navigator.clipboard.writeText(text); toast(msg); }
   catch { const ta = document.createElement('textarea'); ta.value = text; document.body.append(ta); ta.select(); document.execCommand('copy'); ta.remove(); toast(msg); }
-}
-async function getJSON(url) {
-  const r = await fetch(url); const d = await r.json().catch(() => ({}));
-  if (!r.ok) throw new Error(d.error || `Erro ${r.status}`); return d;
 }
 
 async function search(q) {
@@ -149,7 +151,7 @@ async function search(q) {
   history.replaceState(null, '', `?q=${encodeURIComponent(q)}`);
   main.innerHTML = `<p class="status">A procurar “${esc(q)}”…</p>`;
   try {
-    const { teams } = await getJSON(`/api/search?q=${encodeURIComponent(q)}`);
+    const teams = await ClubSources.searchTeams(q);
     if (teams.length === 1) return openClub({ id: teams[0].id });
     if (!teams.length) {
       main.innerHTML = `<p class="status">Não encontrei “${esc(q)}” na base de clubes. Mostro na mesma imagens livres e links de pesquisa para esse nome.</p>`;
@@ -160,16 +162,16 @@ async function search(q) {
         ${t.badge ? `<img src="${esc(t.badge)}/tiny" alt="" loading="lazy">` : ''}
         <span><b>${esc(t.name)}</b><small>${esc([t.country, t.league].filter(Boolean).join(' · '))}</small></span></button>`).join('')}</div>`;
     main.querySelector('.results').addEventListener('click', (e) => { const b = e.target.closest('.result'); if (b) openClub({ id: b.dataset.id }); });
-  } catch (err) { main.innerHTML = `<p class="error">${esc(err.message)}</p>`; }
+  } catch (err) { main.innerHTML = `<p class="error">${esc(friendly(err))}</p>`; }
 }
 
 async function openClub(params, keepIntro = false) {
   const intro = keepIntro ? main.innerHTML : '';
   main.innerHTML = intro + `<p class="status">A reunir imagens…</p>`;
   try {
-    const data = await getJSON(`/api/club?${new URLSearchParams(params)}`);
+    const data = await ClubSources.getClub(params);
     current = data; render(data, intro);
-  } catch (err) { main.innerHTML = intro + `<p class="error">${esc(err.message)}</p>`; }
+  } catch (err) { main.innerHTML = intro + `<p class="error">${esc(friendly(err))}</p>`; }
 }
 
 function render(d, intro) {

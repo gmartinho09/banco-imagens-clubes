@@ -1,5 +1,8 @@
 // Fontes de dados e geração de links para bancos de imagens.
-const SPORTSDB_KEY = process.env.THESPORTSDB_KEY || '123'; // chave gratuita pública
+// Funciona no navegador (GitHub Pages) e no Node.js (server.js).
+(function () {
+const IS_NODE = typeof window === 'undefined';
+const SPORTSDB_KEY = (IS_NODE && process.env.THESPORTSDB_KEY) || '123'; // chave gratuita pública
 const SPORTSDB = `https://www.thesportsdb.com/api/v1/json/${SPORTSDB_KEY}`;
 const UA = 'BancoImagensClubes/1.0 (projeto educativo; Node.js)';
 
@@ -9,7 +12,9 @@ const TTL = 1000 * 60 * 30;
 async function getJSON(url) {
   const hit = cache.get(url);
   if (hit && Date.now() - hit.t < TTL) return hit.v;
-  const res = await fetch(url, { headers: { 'User-Agent': UA, Accept: 'application/json' }, signal: AbortSignal.timeout(12000) });
+  // No navegador não se envia User-Agent: obrigaria a um pedido CORS de verificação que o TheSportsDB recusa.
+  const headers = IS_NODE ? { 'User-Agent': UA, Accept: 'application/json' } : {};
+  const res = await fetch(url, { headers, signal: AbortSignal.timeout(12000) });
   if (!res.ok) throw new Error(`${res.status} em ${new URL(url).host}`);
   const text = await res.text();
   let v;
@@ -142,4 +147,35 @@ function imageBankLinks(name) {
   ];
 }
 
-module.exports = { searchTeams, lookupTeam, teamImages, commonsImages, imageBankLinks, slug };
+// Junta tudo o que a página mostra para um clube: por id do TheSportsDB ou por nome livre.
+async function getClub({ id, q = '' } = {}) {
+  q = String(q).trim().slice(0, 80);
+  let team = null;
+  let groups = [];
+  if (id) {
+    if (!/^\d+$/.test(String(id))) throw new Error('Identificador de clube inválido.');
+    const found = await lookupTeam(id);
+    if (!found) throw new Error('Clube não encontrado.');
+    team = found.summary;
+    groups = await teamImages(found.raw);
+  } else if (q.length < 2) {
+    throw new Error('Escreve pelo menos 2 letras do nome do clube.');
+  }
+  const name = team ? team.alternate.split(',')[0].trim() || team.name : q;
+  const searchName = team ? team.name : q;
+  let commons = [];
+  let commonsError = null;
+  try {
+    commons = await commonsImages(name);
+    if (!commons.length && name !== searchName) commons = await commonsImages(searchName);
+  } catch (e) {
+    commonsError = 'O Wikimedia Commons não respondeu agora. Usa o link do Commons abaixo.';
+  }
+  if (commons.length) groups.push({ key: 'commons', title: 'Wikimedia Commons (licença livre)', source: 'Wikimedia Commons', items: commons });
+  return { team, query: searchName, groups, commonsError, banks: imageBankLinks(searchName) };
+}
+
+const api = { searchTeams, lookupTeam, teamImages, commonsImages, imageBankLinks, getClub, slug };
+if (IS_NODE) module.exports = api;
+else window.ClubSources = api;
+})();
